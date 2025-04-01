@@ -33,6 +33,7 @@ public class InquirerController extends Controller {
             if (currentSection == null) {
                 view.displayFAQ(sharedContext.getFAQ());
                 view.displayInfo("[-1] Return to main menu");
+                view.displayInfo("[-2] Search FAQ");
             } else {
                 view.displayFAQSection(currentSection);
                 view.displayInfo("[-1] Return to " + (currentSection.getParent() == null ? "FAQ" : currentSection.getParent().getTopic()));
@@ -53,6 +54,11 @@ public class InquirerController extends Controller {
 
             try {
                 optionNo = Integer.parseInt(input);
+
+                if (currentSection == null && optionNo == -2) {
+                    searchFAQ();
+                    continue;
+                }
 
                 if (optionNo != -1 && optionNo != -2 && optionNo != -3) {
                     try {
@@ -112,6 +118,52 @@ public class InquirerController extends Controller {
         } else {
             view.displayError("Failed to unregister " + userEmail + " for updates on '" + topic + "'. Perhaps this email was not registered?");
         }
+    }
+    
+    private void searchFAQ() {
+        String keyword = view.getInput("Enter search keyword: ").toLowerCase();
+        if (keyword.strip().isEmpty()) {
+            view.displayWarning("Search keyword cannot be empty!");
+            return;
+        }
+        
+        view.displayInfo("Search results for '" + keyword + "':");
+        view.displayDivider();
+        
+        boolean foundResults = false;
+        List<FAQSection> allSections = new ArrayList<>();
+        List<FAQItem> matchingItems = new ArrayList<>();
+        
+        // Add all root sections
+        allSections.addAll(sharedContext.getFAQ().getSections());
+        
+        // Process all sections and their subsections
+        for (int i = 0; i < allSections.size(); i++) {
+            FAQSection section = allSections.get(i);
+            // Add subsections to be processed
+            allSections.addAll(section.getSubsections());
+            
+            // Check items in this section
+            for (FAQItem item : section.getItems()) {
+                if (item.getQuestion().toLowerCase().contains(keyword) || 
+                    item.getAnswer().toLowerCase().contains(keyword)) {
+                    foundResults = true;
+                    matchingItems.add(item);
+                    view.displayInfo("Topic: " + section.getTopic());
+                    view.displayInfo("Q: " + item.getQuestion());
+                    view.displayInfo("> " + item.getAnswer());
+                    view.displayDivider();
+                }
+            }
+        }
+        
+        if (!foundResults) {
+            view.displayInfo("No results found for '" + keyword + "'");
+        } else {
+            view.displayInfo("Found " + matchingItems.size() + " matching FAQ items");
+        }
+        
+        view.getInput("Press Enter to continue...");
     }
 
     public void contactStaff() {

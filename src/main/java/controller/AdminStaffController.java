@@ -24,12 +24,17 @@ public class AdminStaffController extends StaffController {
                 view.displayInfo("[-1] Return to " + (currentSection.getParent() == null ? "FAQ" : currentSection.getParent().getTopic()));
             }
             view.displayInfo("[-2] Add FAQ item");
+            if (currentSection != null && !currentSection.getItems().isEmpty()) {
+                view.displayInfo("[-3] Remove FAQ item");
+            }
             String input = view.getInput("Please choose an option: ");
             try {
                 int optionNo = Integer.parseInt(input);
 
                 if (optionNo == -2) {
                     addFAQItem(currentSection);
+                } else if (optionNo == -3 && currentSection != null && !currentSection.getItems().isEmpty()) {
+                    removeFAQItem(currentSection);
                 } else if (optionNo == -1) {
                     if (currentSection == null) {
                         break;
@@ -53,6 +58,68 @@ public class AdminStaffController extends StaffController {
         }
     }
 
+    private void removeFAQItem(FAQSection currentSection) {
+        if (currentSection.getItems().isEmpty()) {
+            view.displayWarning("No FAQ items to remove in this section!");
+            return;
+        }
+        
+        view.displayInfo("Select an FAQ item to remove:");
+        for (int i = 0; i < currentSection.getItems().size(); i++) {
+            FAQItem item = currentSection.getItems().get(i);
+            view.displayInfo("[" + i + "] " + item.getQuestion());
+        }
+        view.displayInfo("[-1] Cancel");
+        
+        String input = view.getInput("Please choose an option: ");
+        try {
+            int optionNo = Integer.parseInt(input);
+            
+            if (optionNo == -1) {
+                view.displayInfo("Removal cancelled");
+                return;
+            }
+            
+            if (optionNo >= 0 && optionNo < currentSection.getItems().size()) {
+                FAQItem removedItem = currentSection.getItems().remove(optionNo);
+                
+                String emailSubject = "FAQ topic '" + currentSection.getTopic() + "' updated - Item removed";
+                StringBuilder emailContentBuilder = new StringBuilder();
+                emailContentBuilder.append("The following Q&A has been removed from topic '" + currentSection.getTopic() + "':");
+                emailContentBuilder.append("\n\n");
+                emailContentBuilder.append("Q: ");
+                emailContentBuilder.append(removedItem.getQuestion());
+                emailContentBuilder.append("\n");
+                emailContentBuilder.append("A: ");
+                emailContentBuilder.append(removedItem.getAnswer());
+                
+                String emailContent = emailContentBuilder.toString();
+                
+                email.sendEmail(
+                        ((AuthenticatedUser) sharedContext.currentUser).getEmail(),
+                        SharedContext.ADMIN_STAFF_EMAIL,
+                        emailSubject,
+                        emailContent
+                );
+                
+                for (String subscriberEmail : sharedContext.usersSubscribedToFAQTopic(currentSection.getTopic())) {
+                    email.sendEmail(
+                            SharedContext.ADMIN_STAFF_EMAIL,
+                            subscriberEmail,
+                            emailSubject,
+                            emailContent
+                    );
+                }
+                
+                view.displaySuccess("FAQ item removed successfully");
+            } else {
+                view.displayError("Invalid option: " + optionNo);
+            }
+        } catch (NumberFormatException e) {
+            view.displayError("Invalid option: " + input);
+        }
+    }
+    
     private void addFAQItem(FAQSection currentSection) {
         // When adding an item at root of FAQ, creating a section is mandatory
         boolean createSection = (currentSection == null);
